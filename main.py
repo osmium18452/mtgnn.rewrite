@@ -218,8 +218,7 @@ if __name__ == '__main__':
     test_input, test_gt, test_encoding = data_preprocessor.load_test_samples(encoding=True)
     train_set = LinearsDataset(train_input, train_gt)
     train_loader = DataLoader(train_set, sampler=DistributedSampler(train_set) if multiGPU else None,
-                              batch_size=batch_size,
-                              shuffle=False if multiGPU else True)
+                              batch_size=batch_size, shuffle=False if multiGPU else True)
     valid_loader = None
     # test_loader = None
 
@@ -233,17 +232,14 @@ if __name__ == '__main__':
         test_loader = DataLoader(LinearsDataset(test_input, test_gt), batch_size=batch_size,
                                  shuffle=False)
 
-    for i, (input_x,ground_truth) in enumerate(train_loader):
-        print(input_x.shape,ground_truth.shape)
-    exit()
     from net import gtnet
-    model = gtnet(args.gcn_true, args.buildA_true, args.gcn_depth, args.num_nodes,
-                  device, dropout=args.dropout, subgraph_size=args.subgraph_size,
-                  node_dim=args.node_dim, dilation_exponential=args.dilation_exponential,
-                  conv_channels=args.conv_channels, residual_channels=args.residual_channels,
-                  skip_channels=args.skip_channels, end_channels= args.end_channels,
-                  seq_length=args.seq_in_len, in_dim=args.in_dim, out_dim=args.seq_out_len,
-                  layers=args.layers, propalpha=args.propalpha, tanhalpha=args.tanhalpha, layer_norm_affline=False)
+
+    model = gtnet(True, True, 2, num_sensors, device, dropout=0.3, subgraph_size=20,
+                  node_dim=40, dilation_exponential=2,
+                  conv_channels=16, residual_channels=16,
+                  skip_channels=32, end_channels=64,
+                  seq_length=input_len, in_dim=1, out_dim=output_len,
+                  layers=5, propalpha=0.05, tanhalpha=3, layer_norm_affline=False)
 
     model.to(device)
     optimizer = torch.optim.Adam(model.parameters(), lr=lr)
@@ -257,18 +253,17 @@ if __name__ == '__main__':
     for epoch in range(total_eopchs):
         # train
         model.train()
+        graph=torch.arange(num_sensors)
         total_iters = len(train_loader)
         pbar_iter = None
         if (multiGPU and local_rank == 0) or not multiGPU:
             pbar_iter = tqdm(total=total_iters, ascii=True, dynamic_ncols=True, leave=False)
-        for i, (input_x, encoding_x, input_y, encoding_y, ground_truth) in enumerate(train_loader):
+        for i, (input_x, ground_truth) in enumerate(train_loader):
+            input_x = torch.unsqueeze(input_x,dim=1).transpose(2,3)
             optimizer.zero_grad()
             input_x = input_x.to(device)
-            encoding_x = encoding_x.to(device)
-            input_y = input_y.to(device)
-            encoding_y = encoding_y.to(device)
             ground_truth = ground_truth.to(device)
-            output = model(input_x, encoding_x, input_y, encoding_y, graph)
+            output = model(input_x, graph)
             loss = loss_fn(output, ground_truth)
             loss.backward()
             optimizer.step()
@@ -286,12 +281,10 @@ if __name__ == '__main__':
             pbar_iter = tqdm(total=len(valid_loader), ascii=True, dynamic_ncols=True, leave=False)
             pbar_iter.set_description_str('validating')
             with torch.no_grad():
-                for i, (input_x, encoding_x, input_y, encoding_y, ground_truth) in enumerate(valid_loader):
+                for i, (input_x, ground_truth) in enumerate(valid_loader):
+                    input_x = torch.unsqueeze(input_x,dim=1).transpose(2,3)
                     input_x = input_x.to(device)
-                    encoding_x = encoding_x.to(device)
-                    input_y = input_y.to(device)
-                    encoding_y = encoding_y.to(device)
-                    output = model(input_x, encoding_x, input_y, encoding_y, graph)
+                    output = model(input_x, graph)
                     output_list.append(output.cpu())
                     gt_list.append(ground_truth)
                     pbar_iter.update()
@@ -327,12 +320,10 @@ if __name__ == '__main__':
             model.load_state_dict(torch.load(os.path.join(save_dir, 'best_model.pth')))
         model.eval()
         with torch.no_grad():
-            for i, (input_x, encoding_x, input_y, encoding_y, ground_truth) in enumerate(test_loader):
+            for i, (input_x, ground_truth) in enumerate(test_loader):
+                input_x = torch.unsqueeze(input_x,dim=1).transpose(2,3)
                 input_x = input_x.to(device)
-                encoding_x = encoding_x.to(device)
-                input_y = input_y.to(device)
-                encoding_y = encoding_y.to(device)
-                output = model(input_x, encoding_x, input_y, encoding_y, graph)
+                output = model(input_x, graph)
                 output_list.append(output.cpu())
                 gt_list.append(ground_truth)
                 pbar_iter.update(1)

@@ -234,7 +234,7 @@ if __name__ == '__main__':
 
     from net import gtnet
 
-    model = gtnet(True, True, 2, num_sensors, device, dropout=0.3, subgraph_size=20,
+    model = gtnet(True, True, 2, num_sensors, device, dropout=0.3, subgraph_size=5,
                   node_dim=40, dilation_exponential=2,
                   conv_channels=16, residual_channels=16,
                   skip_channels=32, end_channels=64,
@@ -253,7 +253,7 @@ if __name__ == '__main__':
     for epoch in range(total_eopchs):
         # train
         model.train()
-        graph=torch.arange(num_sensors)
+        graph=torch.arange(num_sensors).to(device)
         total_iters = len(train_loader)
         pbar_iter = None
         if (multiGPU and local_rank == 0) or not multiGPU:
@@ -263,7 +263,8 @@ if __name__ == '__main__':
             optimizer.zero_grad()
             input_x = input_x.to(device)
             ground_truth = ground_truth.to(device)
-            output = model(input_x, graph)
+            output = torch.squeeze(model(input_x, graph))
+            # print(output.shape,ground_truth.shape)
             loss = loss_fn(output, ground_truth)
             loss.backward()
             optimizer.step()
@@ -284,7 +285,7 @@ if __name__ == '__main__':
                 for i, (input_x, ground_truth) in enumerate(valid_loader):
                     input_x = torch.unsqueeze(input_x,dim=1).transpose(2,3)
                     input_x = input_x.to(device)
-                    output = model(input_x, graph)
+                    output = torch.squeeze(model(input_x, graph))
                     output_list.append(output.cpu())
                     gt_list.append(ground_truth)
                     pbar_iter.update()
@@ -323,7 +324,7 @@ if __name__ == '__main__':
             for i, (input_x, ground_truth) in enumerate(test_loader):
                 input_x = torch.unsqueeze(input_x,dim=1).transpose(2,3)
                 input_x = input_x.to(device)
-                output = model(input_x, graph)
+                output = torch.squeeze(model(input_x, graph))
                 output_list.append(output.cpu())
                 gt_list.append(ground_truth)
                 pbar_iter.update(1)

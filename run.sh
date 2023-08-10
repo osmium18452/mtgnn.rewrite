@@ -3,7 +3,7 @@ output_list="720 480 360 320 192 160 96 80 48 40 24 20"
 batch_size=256
 stride=1
 epochs=200
-exec_date=23.7.27.formal.ill
+exec_date=finance.sup
 
 #dataset_count=1
 output_count=1
@@ -35,7 +35,7 @@ cuda="3"
 #done
 
 output_list="24 36 48 60"
-dataset="ill"
+dataset="finance"
 for output_len in $output_list; do
     save_file="save/$exec_date/best/$dataset/$output_len"
     exec="python main.py --fudan -GBDC $cuda -e $epochs -o $output_len -b $batch_size --fixed_seed 3407 -d $dataset -S $save_file --draw --stride $stride"

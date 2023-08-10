@@ -253,13 +253,13 @@ if __name__ == '__main__':
     for epoch in range(total_eopchs):
         # train
         model.train()
-        graph=torch.arange(num_sensors).to(device)
+        graph = torch.arange(num_sensors).to(device)
         total_iters = len(train_loader)
         pbar_iter = None
         if (multiGPU and local_rank == 0) or not multiGPU:
             pbar_iter = tqdm(total=total_iters, ascii=True, dynamic_ncols=True, leave=False)
         for i, (input_x, ground_truth) in enumerate(train_loader):
-            input_x = torch.unsqueeze(input_x,dim=1).transpose(2,3)
+            input_x = torch.unsqueeze(input_x, dim=1).transpose(2, 3)
             optimizer.zero_grad()
             input_x = input_x.to(device)
             ground_truth = ground_truth.to(device)
@@ -283,7 +283,7 @@ if __name__ == '__main__':
             pbar_iter.set_description_str('validating')
             with torch.no_grad():
                 for i, (input_x, ground_truth) in enumerate(valid_loader):
-                    input_x = torch.unsqueeze(input_x,dim=1).transpose(2,3)
+                    input_x = torch.unsqueeze(input_x, dim=1).transpose(2, 3)
                     input_x = input_x.to(device)
                     output = torch.squeeze(model(input_x, graph))
                     output_list.append(output.cpu())
@@ -322,9 +322,11 @@ if __name__ == '__main__':
         model.eval()
         with torch.no_grad():
             for i, (input_x, ground_truth) in enumerate(test_loader):
-                input_x = torch.unsqueeze(input_x,dim=1).transpose(2,3)
+                input_x = torch.unsqueeze(input_x, dim=1).transpose(2, 3)
                 input_x = input_x.to(device)
                 output = torch.squeeze(model(input_x, graph))
+                if len(output.shape) < 3:
+                    output = torch.unsqueeze(output, dim=0)
                 output_list.append(output.cpu())
                 gt_list.append(ground_truth)
                 pbar_iter.update(1)
